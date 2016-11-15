@@ -31,3 +31,8 @@ vignettes/*.pdf
 # Temporary files created by R markdown
 *.utf8.md
 *.knit.md
+/final/
+/milestone_report_cache/
+/milestone_report_files/
+swiftkey_dataset.zip
+bad_words.csv

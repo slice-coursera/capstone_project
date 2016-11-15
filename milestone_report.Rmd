@@ -1,0 +1,165 @@
+---
+title: "Milestone Report - Analysis of text data and NLP"
+author: "B Porter"
+date: "November 6, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(tm)
+require(SnowballC)
+require(ggplot2)
+require(reshape2)
+```
+
+## Summary
+This milestone report will detail the exploratory data analysis and initial modelling of the text data set provided for the capstone project ([Coursera-SwiftKey dataset](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip)). The dataset contains text samples in multiple languages. The focus of this project is on the english text samples. The text samples are sampled from three different sources: twitter, blogs, and news. The goal is to use these text observations to build a text prediction model. This report explains the exploratory data anaylsis performed and the initial predictive model building.
+
+## Getting and Cleaning Data
+The first step is to download and unzip the data. The files that contain the text data to be used in creating the prediction model are also listed. 
+
+```{r download_unzip}
+blog_file_path <- './final/en_US/en_US.blogs.txt'
+if (!file.exists(blog_file_path)){
+    download.file("https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip", "swiftkey_dataset.zip", "auto")
+    unzip('swiftkey_dataset.zip')
+}
+
+# List the english language files to be used in the dataset.
+print(list.files('./final/en_US/'))
+```
+
+The three files that make up the corpus are: en_US.blogs.txt, en_US.news.txt, and en_US.twitter.txt. Now to do some exploratory data analysis using a subset of the text found in each of these files. Before we subsample the dataset let's see what the raw data looks like.
+
+```{r load_data, cache=TRUE}
+corpus <- VCorpus(DirSource('./final/en_US', encoding = "UTF-8"), readerControl = list(reader=readPlain, language="en_US"))
+```
+
+```{r clean_remove_english, cache=TRUE}
+inspect(corpus)
+
+#function to remove non-english words
+removeNonEnglish <- function(x){
+  #replace non-english words with !NonEng!
+  x <- iconv(x, 'latin1', 'ASCII', '!NonEng!')
+  #use gsub to replace any word containing !NonEng! with ''
+  gsub(pattern = '\\S*!NonEng!\\S*', replacement = '',x = x)
+}
+
+corpus <- tm_map(corpus, content_transformer(removeNonEnglish))
+corpus <- tm_map(corpus, content_transformer(gsub), pattern='#\\S*', replacement='')
+corpus <- tm_map(corpus, content_transformer(gsub), pattern='\\S*@\\S*.com', replacement='')
+```
+
+```{r to_lower, cache=TRUE}
+corpus <- tm_map(corpus, content_transformer(tolower))
+corpus <- tm_map(corpus, content_transformer(gsub), pattern='rt|via', replacement='')
+```
+
+```{r remove_num_punc, cache=TRUE}
+corpus <- tm_map(corpus, removeNumbers)
+corpus <- tm_map(corpus, removePunctuation)
+```
+Part of the data cleaning process is removing words that would be offensive to suggest in our predictive text model.
+```{r remove_bad_words, cache=TRUE}
+removeBadWords <- function(corpus){
+  if (!file.exists("bad_words.csv")){
+    download.file("http://www.bannedwordlist.com/lists/swearWords.csv", "bad_words.csv", "auto")
+  }
+  bad.words <- read.csv("bad_words.csv")
+  corpus <- tm_map(corpus, removeWords, bad.words)
+}
+corpus <- removeBadWords(corpus)
+```
+
+```{r stemming, cache=TRUE}
+corpus <- tm_map(corpus, stemDocument, language="english")
+```
+
+```{r remove_whitespace, cache=TRUE}
+corpus <- tm_map(corpus, stripWhitespace)
+```
+
+```{r word_count, cache=TRUE}
+blog_split <- strsplit(as.character(corpus[['en_US.blogs.txt']]), " ")
+blog_line_count <- length(blog_split)
+blog_word_count <- sum(unlist(lapply(blog_split, length)))
+print(blog_word_count)
+
+news_split <- strsplit(as.character(corpus[['en_US.news.txt']]), " ")
+news_line_count <- length(news_split)
+news_word_count <- sum(unlist(lapply(news_split, length)))
+print(news_word_count)
+
+twitter_split <- strsplit(as.character(corpus[['en_US.twitter.txt']]), " ")
+twitter_line_count <- length(twitter_split)
+twitter_word_count <- sum(unlist(lapply(twitter_split, length)))
+print(twitter_word_count)
+```
+
+```{r bar_graph}
+cnts = c(blog_word_count, news_word_count, twitter_word_count)
+line_cnts = c(blog_line_count, news_line_count, twitter_line_count)
+sources = as.factor(c('blog', 'news', 'twitter'))
+word_count_df = data.frame(text=sources, word_count=cnts, line_count=line_cnts)
+head(word_count_df)
+#ggplot(data=word_count_df, aes(x=text, y=word_count, fill=text)) + geom_bar(stat='identity')
+#ggplot(data=word_count_df, aes(x=text, y=line_count, fill=text)) + geom_bar(stat='identity')
+library(reshape2)
+df.long <- melt(word_count_df)
+ggplot(data=df.long, aes(x=text, y=value, fill=variable)) + geom_bar(stat='identity') + facet_grid(.~variable, scales='free')
+```
+
+## Subset the data
+```{r subset_data}
+sub.lines = floor(news_line_count * 0.5)
+sub.news <- news_split[1:sub.lines]
+sn <- sapply(sub.news, paste, collapse=" ")
+sn <- paste(sn, collapse='\n')
+
+sub.blog <- blog_split[1:sub.lines]
+sb <- sapply(sub.blog, paste, collapse=" ")
+sb <- paste(sb, collapse='\n')
+
+sub.twitter <- twitter_split[1:sub.lines]
+st <- sapply(sub.twitter, paste, collapse=" ")
+st <- paste(st, collapse='\n')
+
+
+sample.corpus <- c(VCorpus(VectorSource(sb)),VCorpus(VectorSource(sn)), VCorpus(VectorSource(st)))
+print(sample.corpus)
+```
+
+## Document Term Matrix
+
+Now we create the document term matrix. This will show us how frequent some terms are...
+```{r dtm}
+dtm <- DocumentTermMatrix(sample.corpus)
+freq.terms <- colSums(as.matrix(dtm))
+word.freq.df <- data.frame(term=names(freq.terms), occurences=freq.terms)
+freq.plot <- ggplot(subset(word.freq.df, freq.terms > 10000), aes(term, occurences))
+freq.plot <- freq.plot + geom_bar(stat='identity')
+freq.plot <- freq.plot + theme(axis.text.x=element_text(angle = 45, hjust = 1))
+freq.plot
+
+freq.plot2 <- ggplot(subset(word.freq.df, freq.terms > 5000 & freq.terms < 10000), aes(term, occurences))
+freq.plot2 <- freq.plot2 + geom_bar(stat='identity')
+freq.plot2 <- freq.plot2 + theme(axis.text.x=element_text(angle = 45, hjust = 1))
+freq.plot2
+
+freq.plot3 <- ggplot(subset(word.freq.df, freq.terms > 1000 & freq.terms < 5000), aes(term, occurences))
+freq.plot3 <- freq.plot3 + geom_bar(stat='identity')
+freq.plot3 <- freq.plot3 + theme(axis.text.x=element_text(angle = 45, hjust = 1))
+freq.plot3
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
