@@ -1,7 +1,7 @@
 ---
-title: "Milestone Report - Analysis of text data and NLP"
+title: "Milestone Report - Analysis of Coursera-Swiftkey Dataset"
 author: "B Porter"
-date: "November 6, 2016"
+date: "November 27, 2016"
 output: html_document
 ---
 
@@ -19,11 +19,11 @@ library(RWeka)
 ```
 
 ## Summary
-This milestone report will detail the exploratory data analysis  of the text data set provided for the capstone project ([Coursera-SwiftKey dataset](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip)). The dataset contains text samples in multiple languages. The focus of this project is on the english text samples. The text samples are sampled from three different sources: twitter, blogs, and news. The goal is to use these text observations to build a text prediction model. This report explains the exploratory data anaylsis performed and the initial predictive model building.
+This milestone report will detail the exploratory data analysis  of the text data set provided for the capstone project ([Coursera-SwiftKey dataset](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip)). The dataset contains text samples in multiple languages. The focus of this project is on the english text samples. The text samples are sampled from three different sources: twitter, blogs, and news. The goal is to use these text observations to build a text prediction model. This report explains the exploratory data anaylsis performed and the plans for the predictive n-gram model.
 
 ## Full Swiftkey Dataset Analysis
 
-The first step is to download and unzip the data. The files that contain the text data to be used in creating the prediction model are also listed. 
+The first step is to download and unzip the data. 
 
 ```{r download_unzip}
 blog_file_path <- './final/en_US/en_US.blogs.txt'
@@ -40,11 +40,10 @@ corpus <- VCorpus(DirSource('./final/en_US', encoding = "UTF-8"), readerControl 
 inspect(corpus)
 ```
 
-## Information about the full Corpus
-The first thing to look at after loading the data is to see how many lines of text we have and what is the approximate unfiltered word count. The following code block first converts the corpus documents to a character vector and then splits each line of text by whitespace.Then we get the length of the split list. This gives the line count of the document. Then we sum the length word lists of all lines in a document to get the word count. At the end we will clean up the full dataset corpus because it is very large and from here on we will work with a sample of the full dataset.
+The first thing to look at after loading the data is to see how many lines of text we have and what is the approximate unfiltered word count. The following gives the line count of each document. Then we sum the length of the word lists of each line in the documents to get the word count.
+
 ```{r word_count, cache=TRUE}
-build.count.df <- function(in.corpus){
-  doc.count <- length(inspect(in.corpus))
+build.count.df <- function(in.corpus, doc.count){
   df.counts <- data.frame(document=character(), line.count=integer(), word.count=integer(), stringsAsFactors = F)
   for(i in 1:doc.count){
     split <- strsplit(as.character(corpus[[i]]), " ")
@@ -55,7 +54,7 @@ build.count.df <- function(in.corpus){
   }
   df.counts
 }
-corpus.size.df <- build.count.df(corpus)
+corpus.size.df <- build.count.df(corpus, 3)
 rm(corpus);d<-gc()
 head(corpus.size.df)
 ```
@@ -68,8 +67,10 @@ ggplot(data=df.long, aes(x=document, y=value, fill=variable)) +
 ```
 
 ## Subset the full dataset
-From the initial dataset analysis we see that each text data file is very big. For a further analysis we should generate a smaller sample of the full dataset. 
-```{r subset_data}
+
+From the initial dataset analysis we see that each text data file is very big. For a further analysis we should generate a smaller sample of the full dataset. With the smaller dataset we can hope to extrapolate information about the full dataset. Such as how we will need to clean the data and what are the frequent words, and n-grames in the data.
+
+```{r subset_data, message=FALSE, warning=FALSE}
 set.seed(123321)
 sample.document <- function(file.path, line.count, out.path, percent=0.01){
   sample.doc = sample_lines(file.path, n=line.count*percent, nlines=line.count)
@@ -95,8 +96,6 @@ sample.corpus <- VCorpus(DirSource(sample.dir), readerControl = list(language = 
 In order to use the dataset to accurately predict text we need to first clean the dataset. We have data from different sources and those sources have some terms that do not contribute to an accurate text predictor. For example any twitter hashtag terms are likely not valuable to predict for a user. You also cannot assume that hashtag terms will be sparse. They may be quite common and make text prediction waited towards producing hashtag terms. We also want to remove any non-english terms for this project because we are trying to produce an english text prediction model. 
 
 ```{r clean_remove_english}
-inspect(sample.corpus)
-
 #function to remove non-english words
 removeNonEnglish <- function(x){
   #replace non-english words with !NonEng!
@@ -119,13 +118,15 @@ sample.corpus <- tm_map(sample.corpus, removePunctuation)
 ```
 
 Part of the data cleaning process is removing words that would be offensive to suggest in our predictive text model. For this step I found a word list from a website called bannedwordlist.com. The following script downloads this file if it doesn't already exist and uses it to remove those bad words from the corpus.
-```{r remove_bad_words}
+
+```{r remove_bad_words, message=FALSE, warning=FALSE}
 if (!file.exists("bad_words.csv")) {
   download.file("http://www.bannedwordlist.com/lists/swearWords.csv", "bad_words.csv", "auto")
 }
 bad.words <- read.csv("bad_words.csv")
 sample.corpus <- tm_map(sample.corpus, removeWords, bad.words)
 ```
+The final clean up steps would be to remove stopwords and strip whitespace for the document. For our initial analysis we will not remove the english stop words because they maybe valuable to our prediction model. We may want to predict these stop words and they are very common in normal conversation.
 ```{r remove_whitespace}
 sample.corpus <- tm_map(sample.corpus, stripWhitespace)
 #sample.corpus <- tm_map(sample.corpus, removeWords, stopwords("english"))
@@ -157,7 +158,9 @@ generate.frequencies <- function(dtm, top.num.count=-1){
 ```
 
 ## Most frequent terms plots
+
 After generating the DTM we can create some basic plots to better understand the data. The first three plots show the top ten most common terms per document. You can see from these plots that many of the most frequent words are english stop words. We could filter these out but for the initial exploration I chose to keep them in. 
+
 ```{r dtm_plots}
 list.freqs <- lapply(dtm$dimnames$Docs, function(i) generate.frequencies(dtm[dtm$dimnames$Docs == i,], 10))
 
@@ -176,20 +179,43 @@ p2
 p3 <- create.plot(list.freqs[[3]], "News Top 10 Frequent Terms")
 p3
 ```
-The next plot shows the top 20 most frequent words for the entire corpus. Again, these terms are mostly stop words but it is still valuable to understand what these words are. The plot after that shows a term frequency histogram. This shows that most terms are seen this sample corpus less than 25 times. The terms that are seen most frequent represent the smallest amount of unique terms in the dataset. 
+The next plot shows a term frequency histogram. This shows that most terms are seen this sample corpus less than 25 times. The terms that are seen most frequent represent the smallest amount of unique terms in the dataset. 
 ```{r dtm_plots_2}
-top.20 <- generate.frequencies(dtm, 20)
-p4 <- create.plot(top.20, "Corpus Top 20 Frequent Terms")
-p4
-
 all.frequencies <- generate.frequencies(dtm)
 p5 <- ggplot(data=all.frequencies, aes(all.frequencies$frequency)) + geom_histogram(breaks=seq(1,100, by=5), aes(fill=..count..))
 p5 <- p5 + ggtitle("Term Frequency Histogram") + theme(plot.title = element_text(hjust = 0.5))
 p5
 ```
 
+## Dictionary coverage
+
+Another important part of the dataset to explore is the size of the dataset we would need in order to get coverage of the majority of the terms found in the dataset. This is important because the in-memory size of the model needs to be considered when building the model. If we can cover most of the terms found in the dataset with fewer lines from the dataset it would be ideal in terms of memory and runtime. The following plot shows the coverage percentage as we add more unique terms from the least frequent to the most. As you can see from the plot we get a lot of coverage very quickly. Therefore we can likely use a very small subset of the data and get a large coverage of the terms found in the dataset.
+
+```{r coverage}
+#function to count the number of unique words needed to reach the 
+count.unique.words <- function(freq.vec, coverage.percent){
+  count = 0
+  total.words = sum(freq.vec)
+  while(sum(freq.vec[1:count])/total.words < coverage.percent) count=count + 1
+  count
+}
+# Generate the frequency of one-gram words (from DocumentTermMatrix)
+freq <- colSums(as.matrix(dtm))
+freq <- sort(freq, decreasing = TRUE)
+
+coverage <- data.frame(rate=seq(0, 1, 0.1), word.count=sapply(seq(0, 1, 0.1), function(x) count.unique.words(freq, x)))
+ggplot(coverage, aes(word.count, rate)) + 
+  geom_line() + 
+  scale_y_continuous(breaks = seq(0, 1, 0.1)) +
+  geom_vline(xintercept=coverage[coverage$rate ==0.5, "word.count"], col = 'blue', linetype = 5) + 
+  geom_vline(xintercept=coverage[coverage$rate ==0.9, "word.count"], col = 'blue', linetype = 'longdash') + 
+  ggtitle('Percent coverage by Number of Terms') + 
+  theme(plot.title = element_text(lineheight = .8, face = 'bold')) + 
+  labs(x = 'Number of Terms', y = 'Percent of Dictionary Coverage')
+```
+
 ## N-Grams
-The next thing to do in order to understand the dataset is to explore the bigrams and trigrams. To do this we use the RWeka NGramTokenizer. After creating the DTM using this tokenizer we plot the top 10 most common bigram and trigram terms. These plots show that most common phrases contain those common stop words. There are however some more interesting trigrams. 
+The next thing to do in order to understand the dataset is to explore the bigrams and trigrams. To do this we use the RWeka NGramTokenizer. After creating the DTM using this tokenizer we plot the top 10 most common bigram and trigram terms. These plots show that most common phrases contain common stop words. The n-grams will be integral to building a model. They will be used to build a simple model to predict the next term by finding the maximum likelihood estimation of the next term given the history, or terms that have come before it.
 
 ```{r ngram}
 find.n.gram <- function(corpus, ngram=2){
@@ -216,4 +242,4 @@ bp2
 
 ## Model and Prediction
 
-After doing this exploratory analysis I have a general idea of how to build first an n-gram model. I will start by building a basic n-gram model and use the generated unigram, bigram and trigram from a sample of the corpus. This will be the initial model and I will be the shiny app around it. Once that is done I will come back and try to improve the model coverage and use backoff models to estimate the probability of unobserved n-grams. 
+After doing this exploratory analysis I have a general idea of how to build first an n-gram model. I will start by building a basic n-gram model and use the generated unigram, bigram and trigram from a sample of the corpus. This will be the initial model and I will be the shiny app around it. Once that is done I will come back and try to improve the model coverage and use backoff models to estimate the probability of unobserved n-grams as well as smooth the probabilities for the next term predicted. 
