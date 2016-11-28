@@ -1,36 +1,39 @@
-require(tm)
-loadData <- function(path='./final/en_US/'){
-  blog_file_path <- paste(path,'en_US.blogs.txt', sep='')
+require(quanteda)
+
+downloadData <- function(){
+  blog_file_path <- './final/en_US/en_US.blogs.txt'
   if (!file.exists(blog_file_path)){
     download.file("https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip", "swiftkey_dataset.zip", "auto")
     unzip('swiftkey_dataset.zip')
   }
-  corpus <- VCorpus(DirSource(path, encoding = "UTF-8"), readerControl = list(reader=readPlain, language="en_US"))
-  corpus
 }
 
-removeBadWords <- function(corpus){
+sampleDocument <- function(file.path, line.count, out.path, percent=0.01){
+  sample.doc = sample_lines(file.path, n=line.count*percent, nlines=line.count)
+  out.conn <- file(out.path, "w")
+  writeLines(sample.doc, con = out.conn, sep="")
+  close(out.conn)
+}
+
+getBadWords <- function(){
   if (!file.exists("bad_words.csv")){
     download.file("http://www.bannedwordlist.com/lists/swearWords.csv", "bad_words.csv", "auto")
   }
-  bad.words <- read.csv("bad_words.csv")
-  corpus <- tm_map(corpus, removeWords, bad.words)
+  bad.words <- read.csv("bad_words.csv", colClasses = c("character"), header = F)
+  as.character(bad.words[1,])
 }
 
-cleanData <- function(corpus){
-  corpus <- tm_map(corpus, removeNumbers)
-  corpus <- tm_map(corpus, removePunctuation)
-  corpus <- tm_map(corpus, content_transformer(removeNonEnglish))
-  corpus <- tm_map(corpus, stripWhitespace)
-  corpus <- tm_map(corpus, removeWords, stopwords("english"))
-  corpus <- tm_map(corpus, content_transformer(tolower))
-  corpus <- removeBadWords(corpus)
-  corpus <- tm_map(corpus, stemDocument)
+loadCorpus <- function(corpus.dir='./final/en_US/sample/'){
+  txt.files <- paste(corpus.dir, '*.txt', sep = "")
+  corpus <- corpus(textfile(txt.files))
   corpus
 }
 
-removeNonEnglish <- function(x){
-  x <- iconv(x, 'latin1', 'ASCII', '!NonEng!')
-  gsub(pattern = '\\S*!NonEng!\\S*', replacement = '',x = x)
+cleanCorpus <- function(corpus){
+  #Remove any tokens containing a non-english symbol
+  texts(corpus) <- gsub("\\S*[^ -~]\\S*", "", texts(corpus))
+  #Remove twitter hashtags
+  texts(corpus) <- gsub("#\\S*", "", texts(corpus))
+  #Remove twitter handles
+  texts(corpus) <- gsub("@\\S*", "", texts(corpus))
 }
-
