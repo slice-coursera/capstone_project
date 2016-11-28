@@ -1,4 +1,5 @@
-require(quanteda)
+require(tm)
+require(RWeka)
 
 downloadData <- function(){
   blog_file_path <- './final/en_US/en_US.blogs.txt'
@@ -24,16 +25,39 @@ getBadWords <- function(){
 }
 
 loadCorpus <- function(corpus.dir='./final/en_US/sample/'){
-  txt.files <- paste(corpus.dir, '*.txt', sep = "")
-  corpus <- corpus(textfile(txt.files))
+  corpus <- VCorpus(DirSource(corpus.dir), readerControl = list(language = "en_US"))
   corpus
 }
 
 cleanCorpus <- function(corpus){
+  if (!file.exists("bad_words.csv")) {
+    download.file("http://www.bannedwordlist.com/lists/swearWords.csv", "bad_words.csv", "auto")
+  }
+  bad.words <- read.csv("bad_words.csv")
+  corpus <- tm_map(corpus, removeWords, bad.words)
   #Remove any tokens containing a non-english symbol
-  texts(corpus) <- gsub("\\S*[^ -~]\\S*", "", texts(corpus))
-  #Remove twitter hashtags
-  texts(corpus) <- gsub("#\\S*", "", texts(corpus))
-  #Remove twitter handles
-  texts(corpus) <- gsub("@\\S*", "", texts(corpus))
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*[^ -~]\\S*", replacement="")
+  #Remove hashtag, twitter handles
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="#\\S*", replacement="")
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="@\\S*", replacement="")
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="/|@|\\|", replacement="")
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*.com\\S*", replacement="")
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*.net\\S*", replacement="")
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*.org\\S*", replacement="")
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="rt|via", replacement="")
+  sample.corpus <- tm_map(sample.corpus, stripWhitespace)
+  corpus <- tm_map(corpus, removeNumbers)
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus
 }
+
+generateNGram <- function(corpus, ngram=2){
+  
+  # Create Term Document Matrix with tokenization
+  options(mc.cores=1)
+  gramTokenizer <- function(x) NGramTokenizer(x,Weka_control(min=ngram,max=ngram))
+  dtm <- DocumentTermMatrix(corpus, control = list(tokenize = gramTokenizer))
+  dtm
+}
+
