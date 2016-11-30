@@ -1,5 +1,6 @@
 require(tm)
 require(RWeka)
+require(stringi)
 
 downloadData <- function(){
   blog_file_path <- './final/en_US/en_US.blogs.txt'
@@ -53,11 +54,32 @@ cleanCorpus <- function(corpus){
 }
 
 generateNGram <- function(corpus, ngram=2){
-  
   # Create Term Document Matrix with tokenization
   options(mc.cores=1)
   gramTokenizer <- function(x) NGramTokenizer(x,Weka_control(min=ngram,max=ngram))
   dtm <- DocumentTermMatrix(corpus, control = list(tokenize = gramTokenizer))
   dtm
 }
+
+generateFrequencies <- function(dtm, top.num.count=-1){
+  freq.terms <- colSums(as.matrix(dtm))
+  if (top.num.count > 0){
+    ord <- order(freq.terms)
+    freq.terms <- freq.terms[tail(ord, top.num.count)]
+  }
+  freq.terms.df <- data.frame(term=names(freq.terms), frequency=freq.terms, stringsAsFactors = F)
+  freq.terms.df
+}
+
+dtmToProbs <- function(dtm){
+  freq.terms.df <- generateFrequencies(dtm)
+  freq.terms.df <- freq.terms.df[1:5,]
+  extractHistory <- function(x,pattern, replacement){
+    trimws(gsub(x=x, pattern=pattern, replacement=replacement))
+  }
+  freq.terms.df$last.term <- sapply(freq.terms.df[,"term"], stri_extract_last_words)
+  freq.terms.df$history <-sapply(freq.terms.df[,"term"], extractHistory, pattern='\\S*\\w*$', replacement="")
+  freq.terms.df
+}
+
 
