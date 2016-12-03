@@ -40,13 +40,17 @@ cleanCorpus <- function(corpus){
   corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*[^ -~]\\S*", replacement="")
   #Remove hashtag, twitter handles
   corpus <- tm_map(corpus, content_transformer(gsub), pattern="#\\S*", replacement="")
-  corpus <- tm_map(corpus, content_transformer(gsub), pattern="@\\S*", replacement="")
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*@\\S*", replacement="")
   corpus <- tm_map(corpus, content_transformer(gsub), pattern="/|@|\\|", replacement="")
   corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*.com\\S*", replacement="")
   corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*.net\\S*", replacement="")
   corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*.org\\S*", replacement="")
   corpus <- tm_map(corpus, content_transformer(tolower))
   corpus <- tm_map(corpus, content_transformer(gsub), pattern="rt|via", replacement="")
+  # Remove acronyms
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S\\.([A-z]\\.*)+", replacement="")
+  # Remove single letters
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\s[^I|i|a|A]\\s", replacement=" ")
   sample.corpus <- tm_map(sample.corpus, stripWhitespace)
   corpus <- tm_map(corpus, removeNumbers)
   corpus <- tm_map(corpus, removePunctuation)
@@ -67,18 +71,20 @@ generateFrequencies <- function(dtm, top.num.count=-1){
     ord <- order(freq.terms)
     freq.terms <- freq.terms[tail(ord, top.num.count)]
   }
-  freq.terms.df <- data.frame(term=names(freq.terms), frequency=freq.terms, stringsAsFactors = F)
+  freq.terms.df <- data.frame(term=names(freq.terms), frequency=as.numeric(freq.terms), stringsAsFactors = F)
   freq.terms.df
 }
 
 dtmToProbs <- function(dtm){
   freq.terms.df <- generateFrequencies(dtm)
-  freq.terms.df <- freq.terms.df[1:5,]
+  freq.terms.df <- freq.terms.df[c(1:5, 7000:7005),]
   extractHistory <- function(x,pattern, replacement){
     trimws(gsub(x=x, pattern=pattern, replacement=replacement))
   }
-  freq.terms.df$last.term <- sapply(freq.terms.df[,"term"], stri_extract_last_words)
-  freq.terms.df$history <-sapply(freq.terms.df[,"term"], extractHistory, pattern='\\S*\\w*$', replacement="")
+  freq.terms.df$last.term <- sapply(freq.terms.df$term, stri_extract_last_words)
+  freq.terms.df$history <-sapply(freq.terms.df$term, extractHistory, pattern='\\S*\\w*$', replacement="")
+  #unique.histories.total <- sapply(unique(freq.terms.df[,"history"]), function(x) sum(freq.terms.df[freq.terms.df$history==x, "frequency"]))
+  #freq.terms.df$prob <- apply(freq.terms.df, 1, function(x, totals) as.numeric(x["frequency"])/totals[x["history"]], totals=unique.histories.total)
   freq.terms.df
 }
 
