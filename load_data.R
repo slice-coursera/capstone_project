@@ -1,6 +1,8 @@
 require(tm)
 require(RWeka)
 require(stringi)
+require(data.table)
+require(slam)
 
 downloadData <- function(){
   blog_file_path <- './final/en_US/en_US.blogs.txt'
@@ -26,66 +28,63 @@ getBadWords <- function(){
 }
 
 loadCorpus <- function(corpus.dir='./final/en_US/sample/'){
-  corpus <- VCorpus(DirSource(corpus.dir), readerControl = list(language = "en_US"))
+  corpus <- VCorpus(DirSource(corpus.dir, encoding = "UTF-8"), readerControl = list(language = "en_US"))
   corpus
 }
 
+
+replace.token='__r__m__'
 cleanCorpus <- function(corpus){
   if (!file.exists("bad_words.csv")) {
     download.file("http://www.bannedwordlist.com/lists/swearWords.csv", "bad_words.csv", "auto")
   }
-  bad.words <- read.csv("bad_words.csv")
-  corpus <- tm_map(corpus, removeWords, bad.words)
+  
+  bad.words <- readLines('bad_words.csv')
+  bad.words <- as.character(unlist(strsplit(bad.words, ',')))
+  
   #Remove any tokens containing a non-english symbol
-  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*[^ -~]\\S*", replacement="")
-  #Remove hashtag, twitter handles
-  corpus <- tm_map(corpus, content_transformer(gsub), pattern="#\\S*", replacement="")
-  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*@\\S*", replacement="")
-  corpus <- tm_map(corpus, content_transformer(gsub), pattern="/|@|\\|", replacement="")
-  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*.com\\S*", replacement="")
-  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*.net\\S*", replacement="")
-  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*.org\\S*", replacement="")
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*[^ -~]\\S*", replacement=replace.token)
   corpus <- tm_map(corpus, content_transformer(tolower))
-  corpus <- tm_map(corpus, content_transformer(gsub), pattern="rt|via", replacement="")
-  # Remove acronyms
-  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S\\.([A-z]\\.*)+", replacement="")
-  # Remove single letters
-  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\s[^I|i|a|A]\\s", replacement=" ")
-  sample.corpus <- tm_map(sample.corpus, stripWhitespace)
+  #Remove hashtag, twitter handles
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="#\\S*", replacement=replace.token)
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*@\\S*", replacement=replace.token)
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="/|@|\\|", replacement=" ")
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*.com\\S*", replacement=replace.token)
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*.net\\S*", replacement=replace.token)
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*.org\\S*", replacement=replace.token)
+  corpus <- tm_map(corpus, removeWords, unlist(bad.words))
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="rt|via", replacement=replace.token)
   corpus <- tm_map(corpus, removeNumbers)
   corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, stripWhitespace)
   corpus
 }
 
 generateNGram <- function(corpus, ngram=2){
   # Create Term Document Matrix with tokenization
-  options(mc.cores=1)
+  #options(mc.cores=1)
   gramTokenizer <- function(x) NGramTokenizer(x,Weka_control(min=ngram,max=ngram))
   dtm <- DocumentTermMatrix(corpus, control = list(tokenize = gramTokenizer))
   dtm
 }
 
-generateFrequencies <- function(dtm, top.num.count=-1){
-  freq.terms <- colSums(as.matrix(dtm))
-  if (top.num.count > 0){
-    ord <- order(freq.terms)
-    freq.terms <- freq.terms[tail(ord, top.num.count)]
-  }
-  freq.terms.df <- data.frame(term=names(freq.terms), frequency=as.numeric(freq.terms), stringsAsFactors = F)
-  freq.terms.df
+tdmToFreq <- function(tdm) {
+  # Takes tm TermDocumentMatrix and processes into frequency data.table
+  freq <- sort(row_sums(tdm, na.rm=TRUE), decreasing=TRUE)
+  word <- names(freq)
+  data.table(word=word, freq=freq)
 }
 
-dtmToProbs <- function(dtm){
-  freq.terms.df <- generateFrequencies(dtm)
-  freq.terms.df <- freq.terms.df[c(1:5, 7000:7005),]
-  extractHistory <- function(x,pattern, replacement){
-    trimws(gsub(x=x, pattern=pattern, replacement=replacement))
-  }
-  freq.terms.df$last.term <- sapply(freq.terms.df$term, stri_extract_last_words)
-  freq.terms.df$history <-sapply(freq.terms.df$term, extractHistory, pattern='\\S*\\w*$', replacement="")
-  #unique.histories.total <- sapply(unique(freq.terms.df[,"history"]), function(x) sum(freq.terms.df[freq.terms.df$history==x, "frequency"]))
-  #freq.terms.df$prob <- apply(freq.terms.df, 1, function(x, totals) as.numeric(x["frequency"])/totals[x["history"]], totals=unique.histories.total)
-  freq.terms.df
+generateFrequencies <- function(dtm){
+  freq.terms <- sort(col_sums(dtm, na.rm=T), decreasing = T)
+  freq.terms.dt <- data.table(term=names(freq.terms), frequency=as.numeric(freq.terms))
+  freq.terms.dt
+}
+
+extractHistory <- function(freq.dt){
+  freq.dt[,c("history", "keyword"):=list(unlist(strsplit(term, "[ ]+?[a-z]+$")),
+                                          unlist(strsplit(term, "^([a-z]+[ ])+"))[2]),
+          by=term]
 }
 
 
