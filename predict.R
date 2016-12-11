@@ -29,11 +29,10 @@ ngram_backoff <- function(raw) {
                  " AND n==", i + 1, " LIMIT 3", sep="")
     predicted <- sendQuery(sql)
     #predicted <- dbFetch(res, n=-1)
-    names(predicted) <- c("Next Possible Word", "Score (Adjusted Freq)")
+    names(predicted) <- c("prediction", "probability")
     print(predicted)
     
     if (nrow(predicted) > 0) return(predicted)
   }
-  
-  return("Sorry! You've stumped me, I don't know what would come next.")
+  return("No prediction")
 }

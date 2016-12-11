@@ -2,23 +2,13 @@ require(quanteda)
 require(stringi)
 require(dplyr)
 
-getBadWords <- function(){
-  if (exists("bad.words")){
-    bad.words
-  }
-  if (!file.exists("bad_words.csv")){
-    download.file("http://www.bannedwordlist.com/lists/swearWords.csv", "bad_words.csv", "auto")
-  }
-  bad.words <<- read.csv("bad_words.csv", colClasses = c("character"), header = F)
-  as.character(bad.words[1,])
-}
 
 getFeaturesToIgnore <- function(){
   bad.words <- getBadWords()
   c('#\\S*', '@', '@\\S*', '\\S*[^ -~]\\S*', '/|@|\\|', '\\S*.com\\S*', '\\S\\.([A-z]\\.*)+', bad.words)
 }
 
-loadCorpus <- function(corpus.dir='./final/en_US/sample/'){
+loadCorpusQ <- function(corpus.dir='./final/en_US/sample/'){
   txt.files <- paste(corpus.dir, '*.txt', sep = "")
   corpus <- corpus(textfile(txt.files, encoding='UTF-8'))
   corpus

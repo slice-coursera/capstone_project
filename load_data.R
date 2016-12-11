@@ -3,6 +3,7 @@ require(RWeka)
 require(stringi)
 require(data.table)
 require(slam)
+require(LaF)
 
 downloadData <- function(){
   blog_file_path <- './final/en_US/en_US.blogs.txt'
@@ -12,8 +13,9 @@ downloadData <- function(){
   }
 }
 
-sampleDocument <- function(file.path, line.count, out.path, percent=0.01){
-  sample.doc = sample_lines(file.path, n=line.count*percent, nlines=line.count)
+sampleDocument <- function(file.path, out.path, percent=0.02){
+  flines = determine_nlines(file.path)
+  sample.doc = sample_lines(file.path, n=flines*percent, nlines=flines)
   out.conn <- file(out.path, "w")
   writeLines(sample.doc, con = out.conn, sep="")
   close(out.conn)
@@ -41,7 +43,7 @@ cleanCorpus <- function(corpus){
   
   bad.words <- readLines('bad_words.csv')
   bad.words <- as.character(unlist(strsplit(bad.words, ',')))
-  
+  corpus <- tm_map(corpus, removePunctuation)
   #Remove any tokens containing a non-english symbol
   corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*[^ -~]\\S*", replacement=replace.token)
   corpus <- tm_map(corpus, content_transformer(tolower))
@@ -55,7 +57,7 @@ cleanCorpus <- function(corpus){
   corpus <- tm_map(corpus, removeWords, unlist(bad.words))
   corpus <- tm_map(corpus, content_transformer(gsub), pattern="rt|via", replacement=replace.token)
   corpus <- tm_map(corpus, removeNumbers)
-  corpus <- tm_map(corpus, removePunctuation)
+  #corpus <- tm_map(corpus, removePunctuation)
   corpus <- tm_map(corpus, stripWhitespace)
   corpus
 }
@@ -63,7 +65,7 @@ cleanCorpus <- function(corpus){
 generateNGram <- function(corpus, ngram=2){
   # Create Term Document Matrix with tokenization
   #options(mc.cores=1)
-  gramTokenizer <- function(x) NGramTokenizer(x,Weka_control(min=ngram,max=ngram))
+  gramTokenizer <- function(x) NGramTokenizer(x,Weka_control(min=ngram,max=ngram,delimiters=' \r\n\t'))
   dtm <- DocumentTermMatrix(corpus, control = list(tokenize = gramTokenizer))
   dtm
 }
