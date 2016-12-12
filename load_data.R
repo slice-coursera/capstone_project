@@ -43,7 +43,6 @@ cleanCorpus <- function(corpus){
   
   bad.words <- readLines('bad_words.csv')
   bad.words <- as.character(unlist(strsplit(bad.words, ',')))
-  corpus <- tm_map(corpus, removePunctuation)
   #Remove any tokens containing a non-english symbol
   corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*[^ -~]\\S*", replacement=replace.token)
   corpus <- tm_map(corpus, content_transformer(tolower))
@@ -55,9 +54,9 @@ cleanCorpus <- function(corpus){
   corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*.net\\S*", replacement=replace.token)
   corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*.org\\S*", replacement=replace.token)
   corpus <- tm_map(corpus, removeWords, unlist(bad.words))
-  corpus <- tm_map(corpus, content_transformer(gsub), pattern="rt|via", replacement=replace.token)
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\b*(rt)", replacement=replace.token)
   corpus <- tm_map(corpus, removeNumbers)
-  #corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="[^[:alnum:][:space:]'_]", replacement=" ")
   corpus <- tm_map(corpus, stripWhitespace)
   corpus
 }
