@@ -3,8 +3,23 @@ require(magrittr)
 require(stringr)
 require(tm)
 
-source('database_helper.R')
-source('load_data.R')
+cleanCorpus <- function(corpus){
+  #Remove any tokens containing a non-english symbol
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*[^ -~]\\S*", replacement=replace.token)
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  corpus <- tm_map(corpus, removeNumbers)
+  # remove punctuation
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="[^[:alnum:][:space:]']", replacement=" ")
+  corpus <- tm_map(corpus, stripWhitespace)
+  corpus
+}
+
+sendQuery <- function(query){
+  db <- dbConnect(SQLite(), dbname="ngram.db")
+  result <- dbGetQuery(db, query)
+  dbDisconnect(db)
+  result
+}
 
 rawToClean <- function(raw){
   sentence <- VCorpus(VectorSource(raw))
@@ -15,7 +30,7 @@ rawToClean <- function(raw){
   sentence
 }
 
-predictNext <- function(raw, max_ngram=3) {
+predictNext <- function(raw, max_ngram=4) {
   # From Brants et al 2007.
   # Find if n-gram has been seen, if not, multiply by alpha and back off
   # to lower gram model. Alpha unnecessary here, independent backoffs.
@@ -34,3 +49,4 @@ predictNext <- function(raw, max_ngram=3) {
   }
   return("No prediction")
 }
+

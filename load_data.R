@@ -35,7 +35,7 @@ loadCorpus <- function(corpus.dir='./final/en_US/sample/'){
 }
 
 
-replace.token='__r__m__'
+replace.token='removeemee'
 cleanCorpus <- function(corpus){
   if (!file.exists("bad_words.csv")) {
     download.file("http://www.bannedwordlist.com/lists/swearWords.csv", "bad_words.csv", "auto")
@@ -56,7 +56,7 @@ cleanCorpus <- function(corpus){
   corpus <- tm_map(corpus, removeWords, unlist(bad.words))
   corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\b*(rt)", replacement=replace.token)
   corpus <- tm_map(corpus, removeNumbers)
-  corpus <- tm_map(corpus, content_transformer(gsub), pattern="[^[:alnum:][:space:]'_]", replacement=" ")
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="[^[:alnum:][:space:]']", replacement=" ")
   corpus <- tm_map(corpus, stripWhitespace)
   corpus
 }
@@ -83,9 +83,8 @@ generateFrequencies <- function(dtm){
 }
 
 extractHistory <- function(freq.dt){
-  freq.dt[,c("history", "keyword"):=list(unlist(strsplit(term, "[ ]+?[a-z]+$")),
-                                          unlist(strsplit(term, "^([a-z]+[ ])+"))[2]),
-          by=term]
+  freq.dt[,c("history", "keyword"):=list(unlist(strsplit(term, "[ ]+?[[:alnum:]]+$")),
+                                         unlist(strsplit(term, "^([[:alnum:]']+[ ])+"))[2]), by=term]
 }
 
 

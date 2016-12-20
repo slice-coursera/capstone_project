@@ -13,6 +13,6 @@ generateFreqDT <- function(corpus, ngram=2){
 }
 
 processToDB <- function(corpus, ngram=2){
-  generateFreqDT(corpus, ngram)
+  freq.dt <- generateFreqDT(corpus, ngram)
   writeFreqDT(freq.dt)
 }
