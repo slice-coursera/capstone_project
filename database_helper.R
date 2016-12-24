@@ -12,10 +12,3 @@ sendQuery <- function(query){
   dbDisconnect(db)
   result
 }
-
-readGrams <- function(){
-  db <- dbConnect(SQLite(), dbname="ngram.db")
-  freq.dt <- data.table(dbReadTable(conn = db, 'grams', freq.dt, append=T))
-  dbDisconnect(db)
-  freq.dt
-}

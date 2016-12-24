@@ -24,5 +24,4 @@ shinyServer(function(input, output) {
       return(unlist(out)[1])
     }})
   output$alts <- renderTable({dbout()})
-  output$wordCloud <- renderPlot(wordcloud())
 })

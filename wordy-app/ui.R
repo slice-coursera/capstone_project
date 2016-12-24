@@ -33,8 +33,7 @@ shinyUI(fluidPage(
       h1(textOutput("predicted"), align="center", style="color:blue"),
       hr(),
       h3("Top 3 Possibilities:", align="center"),
-      div(tableOutput("alts"), align="center"),
-      div(plotOutput("wordCloud", align="center"))
+      div(tableOutput("alts"), align="center")
     )
   )
 ))

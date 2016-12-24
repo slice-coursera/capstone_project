@@ -2,10 +2,11 @@
 require(magrittr)
 require(stringr)
 require(tm)
+require(RSQLite)
 
 cleanCorpus <- function(corpus){
   #Remove any tokens containing a non-english symbol
-  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*[^ -~]\\S*", replacement=replace.token)
+  corpus <- tm_map(corpus, content_transformer(gsub), pattern="\\S*[^ -~]\\S*", replacement=" ")
   corpus <- tm_map(corpus, content_transformer(tolower))
   corpus <- tm_map(corpus, removeNumbers)
   # remove punctuation
