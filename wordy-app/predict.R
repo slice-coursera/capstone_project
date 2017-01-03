@@ -3,6 +3,7 @@ require(magrittr)
 require(stringr)
 require(tm)
 require(RSQLite)
+require(data.table)
 
 cleanCorpus <- function(corpus){
   #Remove any tokens containing a non-english symbol
@@ -19,7 +20,7 @@ sendQuery <- function(query){
   db <- dbConnect(SQLite(), dbname="ngram.db")
   result <- dbGetQuery(db, query)
   dbDisconnect(db)
-  result
+  as.data.table(result)
 }
 
 rawToClean <- function(raw){
@@ -36,18 +37,32 @@ predictNext <- function(raw, max_ngram=4) {
   # Find if n-gram has been seen, if not, multiply by alpha and back off
   # to lower gram model. Alpha unnecessary here, independent backoffs.
   sentence <- rawToClean(raw)
-  for (i in min(length(sentence), max_ngram):1) {
+  predicted <- data.table(history=character(), keyword=character(), frequency=integer(), probability=numeric(), n=integer())
+  alpha <- 1.0
+  for (i in min(length(sentence), max_ngram):0) {
+    if (i < max_ngram){
+      alpha <- 0.4 ^ (max_ngram - i)
+    }
     gram <- paste(tail(sentence, i), collapse=" ")
-    print(gram)
-    sql <- paste("SELECT keyword, prob FROM grams WHERE ", 
+    if (i == 0){
+      gram = "<NA>"
+    }
+    #print(gram)
+    sql <- paste("SELECT * FROM grams WHERE ", 
                  " history==\"", paste(gram), "\"",
-                 " AND n==", i + 1, " LIMIT 3", sep="")
-    print(sql)
-    predicted <- sendQuery(sql)
-    #predicted <- dbFetch(res, n=-1)
-    names(predicted) <- c("prediction", "probability")
-    if (nrow(predicted) > 0) return(predicted)
+                 " AND n==", i + 1, " LIMIT 5", sep="")
+    # print(sql)
+    predictedN <- sendQuery(sql)
+    predictedN[,probability:=probability*alpha]
+    # names(predictedN) <- c("prediction", "probability")
+    if (nrow(predictedN) > 0){
+      predicted <- rbind(predicted, predictedN)
+      
+    }
+    if (nrow(predicted) >= 5){
+      return(predicted[,.(probability=max(probability)), by=keyword])
+    }
   }
-  return("No prediction")
+  return(predicted[,.(probability=max(probability)), by=keyword])
 }
 

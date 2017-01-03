@@ -13,27 +13,29 @@ library(shiny)
 shinyUI(fluidPage(
   
   # Application title
-  titlePanel("Next Word Prediction using the Backoff Model"),
+  titlePanel("Next Word Prediction using Backoff Model"),
   h4("B. Porter's Coursera Data Science Capstone App", style="color:gray"),
   hr(),
   
   # Sidebar with a slider input for number of bins 
   sidebarLayout(
-    sidebarPanel(
-      textInput("text", label = h3("Input"), value = "how are"),
-      helpText("Type in text above. "),
-      submitButton("Predict next"),
-      hr()
-    ),
-    
     # Show the prediction
     mainPanel(
-      br(),
-      h2(textOutput("sentence"), align="center"),
-      h1(textOutput("predicted"), align="center", style="color:blue"),
+      textInput("text", label = h3("Input Text"), value = "how are"),
+      helpText("Type your input text above and start by clicking the Predict! button."),
+      actionButton("predict_next", "Predict!"),
+      hr()
+    ),
+    sidebarPanel(
+      h3("Your Input"),
+      p(textOutput("sentence")),
       hr(),
-      h3("Top 3 Possibilities:", align="center"),
-      div(tableOutput("alts"), align="center")
+      h3("Prediction Options"),
+      helpText("Click prediction to append to input text"),
+      div(uiOutput("option_1"),br(), uiOutput("option_2"), br(), uiOutput("option_3")),
+      hr(),
+      h4("Top Possibilities:", align="center"),
+      div(tableOutput("top_results"), align="center")
     )
   )
 ))

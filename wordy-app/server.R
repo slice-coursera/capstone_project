@@ -11,17 +11,44 @@ library(shiny)
 library(wordcloud)
 source('predict.R')
 
-# Define server logic required to draw a histogram
-shinyServer(function(input, output) {
-  dbout <- reactive({predictNext(input$text)})
-  
-  output$sentence <- renderText({input$text})
-  output$predicted <- renderText({
-    out <- dbout()
-    if (out[[1]] == "No prediction") {
-      return(out)
-    } else {
-      return(unlist(out)[1])
-    }})
-  output$alts <- renderTable({dbout()})
+
+shinyServer(function(input, output, session) {
+  observeEvent(input$predict_next, {
+    dbout <- reactive({predictNext(input$text)})
+    
+    output$sentence <- renderText({input$text})
+    output$predicted <- renderText({
+      out <- dbout()
+      return(out[1,keyword])
+    })
+    output$top_results <- renderTable({dbout()})
+    
+    output$option_1 <- renderUI({
+      out <- dbout()
+      actionButton("action1", label = out[1,keyword])
+    })
+    observeEvent(input$action1, {
+      out <- dbout()
+      updateTextInput(session, "text", value = paste(input$text, out[1,keyword]))
+    })
+    
+    output$option_2 <- renderUI({
+      out <- dbout()
+      actionButton("action2", label = out[2,keyword])
+    })
+    observeEvent(input$action2, {
+      out <- dbout()
+      updateTextInput(session, "text", value = paste(input$text, out[2,keyword]))
+    })
+    
+    output$option_3 <- renderUI({
+      out <- dbout()
+      actionButton("action3", label = out[3,keyword])
+    })
+    observeEvent(input$action3, {
+      out <- dbout()
+      updateTextInput(session, "text", value = paste(input$text, out[3,keyword]))
+    })
+    
+  })
 })
