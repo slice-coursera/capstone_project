@@ -40,7 +40,7 @@ predictNext <- function(raw, max_ngram=4) {
   predicted <- data.table(history=character(), keyword=character(), frequency=integer(), probability=numeric(), n=integer())
   alpha <- 1.0
   for (i in min(length(sentence), max_ngram):0) {
-    if (i < max_ngram){
+    if (i < max_ngram & i > 0){
       alpha <- 0.4 ^ (max_ngram - i)
     }
     gram <- paste(tail(sentence, i), collapse=" ")
@@ -54,15 +54,14 @@ predictNext <- function(raw, max_ngram=4) {
     # print(sql)
     predictedN <- sendQuery(sql)
     predictedN[,probability:=probability*alpha]
-    # names(predictedN) <- c("prediction", "probability")
     if (nrow(predictedN) > 0){
       predicted <- rbind(predicted, predictedN)
       
     }
     if (nrow(predicted) >= 5){
-      return(predicted[,.(probability=max(probability)), by=keyword])
+      return(predicted[,.(score=max(probability)), by=keyword])
     }
   }
-  return(predicted[,.(probability=max(probability)), by=keyword])
+  return(predicted[,.(score=max(probability)), by=keyword])
 }
 
