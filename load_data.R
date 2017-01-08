@@ -1,4 +1,5 @@
 require(tm)
+require(LaF)
 
 downloadData <- function(){
   blog_file_path <- './final/en_US/en_US.blogs.txt'
@@ -11,6 +12,9 @@ downloadData <- function(){
 sampleDocument <- function(file.path, out.path, percent=0.02){
   flines = determine_nlines(file.path)
   sample.doc = sample_lines(file.path, n=flines*percent, nlines=flines)
+  if (!dir.exists(dirname(out.path))){
+    dir.create(dirname(out.path), recursive = T)
+  }
   out.conn <- file(out.path, "w")
   writeLines(sample.doc, con = out.conn, sep="")
   close(out.conn)

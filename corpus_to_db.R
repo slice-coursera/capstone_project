@@ -59,20 +59,27 @@ removeBadWordsFromFreqDT <- function(freq.dt){
   freq.dt
 }
 
-generateFreqDT <- function(corpus, ngram=2){
+generateFreqDT <- function(corpus, ngram=2, onlyKeepTop=TRUE){
   clean.corpus <- cleanCorpus(corpus)
+  print("corpus clean...")
   if (ngram <= 0 | ngram > 6){
     return(NULL)
   }
   dtm <- generateNGram(clean.corpus, ngram)
+  print("dtm created...")
   freq.dt <- generateFrequencies(dtm)
   freq.dt <- freq.dt[!term %like% replace.token]
+  print("freq.dt created...")
   extractHistory(freq.dt)
+  print("history extracted...")
   # freq.dt <- freq.dt[!keyword %in% stopwords()]
   freq.dt <- removeBadWordsFromFreqDT(freq.dt)
+  print("bad words removed...")
   if (ngram > 1){
     ## limit the number of each history you get
-    freq.dt <- freq.dt[, head(.SD,5), by=history]
+    if (onlyKeepTop) {
+      freq.dt <- freq.dt[, head(.SD,5), by=history]  
+    }
     freq.dt[, "total":=list(sum(frequency)), by=history][, "probability":=list(frequency/total)]
   } else {
     freq.dt[, "total":=list(sum(frequency))][, "probability":=list(frequency/total)][, keyword:=history][, history:="<NA>"]

@@ -4,39 +4,45 @@ author: B. Porter
 date: 2016-01-02
 autosize: true
 
-The Wordy App for Coursera Data Science Specialization Capstone Project
+Presentation of the ShinyIO app called "Wordy" for Coursera Data Science Specialization Capstone Project
 
 Introduction
 ========================================================
 
-- Goal: Develop an algorithm to predict the next word in a sentence and create a shiny app to demonstrate the algorithm.
-- Algorithm: This app uses N-gram models with Stupid Backoff to smooth and predict on terms not seen in the highest level N-gram model.
-- Shiny App: The shiny app is a simple UI that allows users to interact with the text prediction model and create next text based on the predictions
+- Goal: Develop algorithm to predict the next term in a sentence and create a shiny app to show off algorithm
+- Algorithm: N-gram models with Stupid Backoff to smooth and predict on unseen terms
+- ShinyIO App: A simple UI to interact with the text prediction model and create new text
 
 ***
-![Prediction Model Image](wordy-app-presentation-figure/shiny_app_screen.png)
+<div text-align="center">Stupid Backoff Diagram</div>
+![Prediction Model Image](wordy-app-presentation-figure/quad_stupid_backoff_figure.jpg)
 
 
 Prediction Model
 ========================================================
-- The prediction model is an N-gram model that uses Stupid Backoff for smoothing as described in [Large Language Models in Machine Translation](http://www.aclweb.org/anthology/D07-1090.pdf)
-- Stupid backoff is a simple variation of other smoothing techniques that does not generate normalized probabilities but instead uses relative frequencies.
-- The scores are for the backoff model are calculated using the following scheme:
+- N-gram model that uses Stupid Backoff for smoothing as described in [Large Language Models in Machine Translation](http://www.aclweb.org/anthology/D07-1090.pdf)
+- Scores are calculated using the following scheme. We used $\alpha = 0.4$
 
 $$
-S(w|w_{i-k+1}^{i-1}) = \\ \left\{\begin{matrix}
+S(w|w_{i-k+1}^{i-1}) = \left\{\begin{matrix}
 \frac{f(w_{i-k+1}^i)}{w_{i-k+1}^{i-1}}, \mathbf{if} f(w_{i-k+1}^i) > 0 & \\ 
- & 
+\alpha S(w_i|w_{i-k+2}^{i-1}) & otherwise
 \end{matrix}\right.
 $$
 
-****
-![Prediction Model Image](wordy-app-presentation-figure/quad_stupid_backoff_figure.jpg)
 
 Quantitative Results
 ========================================================
-- The model we have presented uses relative frequency and not normalized probabilities therefore Perplexity cannot be calculated.
-- n-Gram Coverage is used instead to get an indication of quality improvements with increased training sizes
+- Model uses relative frequency score, not normalized probabilities so perplexity cannot be used.
+- Graph shows how many 4-grams in the test dataset were seen by 4-grams in training dataset as dataset size increases
+<div align="center">
+```{r plot_quant, echo=F}
+q.metric <- read.table('./quantitative_metric.RData')
+plot(q.metric$n.gram.count/1e6, q.metric$coverage, type = 'b',
+     xlab = 'Training data size in millions of tokens', ylab='Test data percent coverage',
+    main = "N-Gram Model Quantitative Comparison")
+```
+</div>
 
 Wordy - The Shiny App
 ========================================================
